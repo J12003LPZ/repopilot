@@ -6,6 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { Code, Globe, ArrowRight, Loader2 } from "lucide-react";
 import { createScanSchema, type CreateScanInput } from "@/lib/validators/scanSchema";
+import { parseRepoUrl } from "@/lib/github/parseRepoUrl";
+import { addHistory } from "@/lib/history";
 import { Button } from "@/components/ui/Button";
 
 export function ScanForm() {
@@ -29,8 +31,16 @@ export function ScanForm() {
       setServerError(data.error ?? "Something went wrong. Please try again.");
       return;
     }
-    const { scanId, scanToken } = await res.json();
+    const { scanId, publicId, scanToken } = await res.json();
     localStorage.setItem(`repopilot-scan-token-${scanId}`, scanToken);
+    const parsed = parseRepoUrl(values.githubUrl);
+    addHistory({
+      scanId,
+      publicId,
+      repoUrl: values.githubUrl,
+      repoName: parsed ? `${parsed.owner}/${parsed.name}` : values.githubUrl,
+      createdAt: new Date().toISOString(),
+    });
     router.push(`/scan/${scanId}`);
   }
 

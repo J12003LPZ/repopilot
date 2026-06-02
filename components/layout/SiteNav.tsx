@@ -17,10 +17,10 @@ export function SiteNav() {
         {/* Center nav links */}
         <nav className="hidden md:flex items-center gap-6">
           <Link
-            href="/demo"
+            href="/dashboard"
             className="text-text-secondary hover:text-primary transition-colors text-sm"
           >
-            Demo
+            Dashboard
           </Link>
           <Link
             href="/case-study"
@@ -29,7 +29,7 @@ export function SiteNav() {
             Case Study
           </Link>
           <a
-            href="https://github.com"
+            href="https://github.com/J12003LPZ/repopilot"
             target="_blank"
             rel="noopener noreferrer"
             className="text-text-secondary hover:text-primary transition-colors text-sm"
