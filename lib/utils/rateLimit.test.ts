@@ -20,7 +20,7 @@ describe("evaluateRateLimit", () => {
       activeLimit: 1,
     });
     expect(result.allowed).toBe(false);
-    expect(result.reason).toBe("hourly_limit");
+    if (!result.allowed) expect(result.reason).toBe("hourly_limit");
   });
 
   it("blocks when an active scan is already running", () => {
@@ -31,6 +31,6 @@ describe("evaluateRateLimit", () => {
       activeLimit: 1,
     });
     expect(result.allowed).toBe(false);
-    expect(result.reason).toBe("active_limit");
+    if (!result.allowed) expect(result.reason).toBe("active_limit");
   });
 });
