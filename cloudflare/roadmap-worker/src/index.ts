@@ -15,7 +15,7 @@ type RequestBody = {
   }>;
 };
 
-export default {
+const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method !== "POST") {
       return new Response("Method not allowed", { status: 405 });
@@ -83,3 +83,5 @@ export default {
     return Response.json(roadmap);
   },
 };
+
+export default worker;
