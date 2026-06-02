@@ -1,0 +1,162 @@
+import {
+  pgTable,
+  uuid,
+  text,
+  integer,
+  numeric,
+  boolean,
+  timestamp,
+  jsonb,
+} from "drizzle-orm/pg-core";
+
+export const repositories = pgTable("repositories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  githubOwner: text("github_owner").notNull(),
+  githubName: text("github_name").notNull(),
+  githubUrl: text("github_url").notNull(),
+  defaultBranch: text("default_branch"),
+  description: text("description"),
+  stars: integer("stars").default(0),
+  forks: integer("forks").default(0),
+  watchers: integer("watchers").default(0),
+  openIssues: integer("open_issues").default(0),
+  primaryLanguage: text("primary_language"),
+  license: text("license"),
+  repoSizeKb: integer("repo_size_kb"),
+  lastPushedAt: timestamp("last_pushed_at", { withTimezone: true }),
+  githubCreatedAt: timestamp("github_created_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const scans = pgTable("scans", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  repositoryId: uuid("repository_id").references(() => repositories.id, {
+    onDelete: "cascade",
+  }),
+  deployedUrl: text("deployed_url"),
+  status: text("status").default("queued"),
+  errorMessage: text("error_message"),
+  overallScore: integer("overall_score"),
+  activityScore: integer("activity_score"),
+  qualityScore: integer("quality_score"),
+  securityScore: integer("security_score"),
+  performanceScore: integer("performance_score"),
+  accessibilityScore: integer("accessibility_score"),
+  aiSummary: text("ai_summary"),
+  roadmap: jsonb("roadmap"),
+  publicId: text("public_id").unique().notNull(),
+  scanToken: text("scan_token").notNull(),
+  ipHash: text("ip_hash"),
+  userAgent: text("user_agent"),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const scanFindings = pgTable("scan_findings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  scanId: uuid("scan_id").references(() => scans.id, { onDelete: "cascade" }),
+  category: text("category").notNull(),
+  severity: text("severity").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  recommendation: text("recommendation"),
+  source: text("source"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const repoMetrics = pgTable("repo_metrics", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  scanId: uuid("scan_id").references(() => scans.id, { onDelete: "cascade" }),
+  commits30d: integer("commits_30d"),
+  commits90d: integer("commits_90d"),
+  openIssues: integer("open_issues"),
+  openPrs: integer("open_prs"),
+  staleIssues: integer("stale_issues"),
+  stalePrs: integer("stale_prs"),
+  avgIssueAgeDays: numeric("avg_issue_age_days"),
+  avgPrAgeDays: numeric("avg_pr_age_days"),
+  oldestIssueDays: integer("oldest_issue_days"),
+  oldestPrDays: integer("oldest_pr_days"),
+  contributorCount: integer("contributor_count"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const qualityMetrics = pgTable("quality_metrics", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  scanId: uuid("scan_id").references(() => scans.id, { onDelete: "cascade" }),
+  hasReadme: boolean("has_readme"),
+  readmeScore: integer("readme_score"),
+  hasPackageJson: boolean("has_package_json"),
+  hasTypescript: boolean("has_typescript"),
+  hasEslint: boolean("has_eslint"),
+  hasPrettier: boolean("has_prettier"),
+  hasTests: boolean("has_tests"),
+  hasTestScript: boolean("has_test_script"),
+  hasLintScript: boolean("has_lint_script"),
+  hasTypecheckScript: boolean("has_typecheck_script"),
+  hasCi: boolean("has_ci"),
+  hasEnvExample: boolean("has_env_example"),
+  packageManager: text("package_manager"),
+  framework: text("framework"),
+  rawResult: jsonb("raw_result"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const securityMetrics = pgTable("security_metrics", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  scanId: uuid("scan_id").references(() => scans.id, { onDelete: "cascade" }),
+  possibleSecretCount: integer("possible_secret_count").default(0),
+  dependencyVulnerabilityCount: integer("dependency_vulnerability_count").default(0),
+  criticalVulnerabilityCount: integer("critical_vulnerability_count").default(0),
+  highVulnerabilityCount: integer("high_vulnerability_count").default(0),
+  hasSecurityMd: boolean("has_security_md"),
+  hasLicense: boolean("has_license"),
+  hasLockfile: boolean("has_lockfile"),
+  rawResult: jsonb("raw_result"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+// Reserved for deferred features — created now, populated later.
+export const performanceMetrics = pgTable("performance_metrics", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  scanId: uuid("scan_id").references(() => scans.id, { onDelete: "cascade" }),
+  url: text("url"),
+  performanceScore: integer("performance_score"),
+  lcp: numeric("lcp"),
+  cls: numeric("cls"),
+  inp: numeric("inp"),
+  fcp: numeric("fcp"),
+  tbt: numeric("tbt"),
+  speedIndex: numeric("speed_index"),
+  rawResult: jsonb("raw_result"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const accessibilityResults = pgTable("accessibility_results", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  scanId: uuid("scan_id").references(() => scans.id, { onDelete: "cascade" }),
+  url: text("url"),
+  violationCount: integer("violation_count"),
+  criticalCount: integer("critical_count"),
+  seriousCount: integer("serious_count"),
+  moderateCount: integer("moderate_count"),
+  minorCount: integer("minor_count"),
+  rawResult: jsonb("raw_result"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const scanJobs = pgTable("scan_jobs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  scanId: uuid("scan_id").references(() => scans.id, { onDelete: "cascade" }),
+  status: text("status").default("queued"),
+  attempts: integer("attempts").default(0),
+  maxAttempts: integer("max_attempts").default(3),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+});
