@@ -32,8 +32,9 @@ login in the way.
   SECURITY.md presence (secret values are never stored or shown).
 - **Weighted scoring** — an overall health score plus per-category scores.
 - **AI roadmap** — executive summary, top risks, quick wins, long-term plan, a
-  suggested first PR, and estimated impact. Backed by a Cloudflare Worker, with a
-  deterministic template fallback so it always produces a result.
+  suggested first PR, and estimated impact. The executive summary is enriched by
+  Cloudflare Workers AI (called via REST), with a deterministic template fallback so
+  it always produces a result.
 - **Shareable employer report** — a clean, print-friendly `/report/[publicId]` page.
 
 ## Tech stack
@@ -43,7 +44,7 @@ login in the way.
 | Framework   | Next.js 16 (App Router) + React 19 + TypeScript |
 | Host        | Vercel |
 | Database    | Neon Postgres (`@neondatabase/serverless`) + Drizzle ORM |
-| AI          | Cloudflare Worker (Workers AI) + deterministic template fallback |
+| AI          | Cloudflare Workers AI (REST API) + deterministic template fallback |
 | Styling     | Tailwind CSS v4 (design tokens in `app/globals.css`) |
 | Charts      | Recharts |
 | Forms / validation | React Hook Form + Zod |
@@ -130,21 +131,22 @@ Open http://localhost:3000. The `/demo` page works even without a database.
 | `GITHUB_TOKEN` | recommended | GitHub read token (raises rate limits); server-side only |
 | `IP_HASH_SALT` | recommended | Salt for hashing visitor IPs; server-side only |
 | `NEXT_PUBLIC_APP_URL` | recommended | Base URL for building shareable report links |
-| `CLOUDFLARE_AI_URL` | optional | Deployed roadmap Worker URL; unset → template roadmap |
-| `CLOUDFLARE_AI_SECRET` | optional | Shared secret matching the Worker's `SHARED_SECRET` |
+| `CLOUDFLARE_API_KEY` | optional | Cloudflare API token with Workers AI access; unset → template roadmap |
+| `CLOUDFLARE_ACCOUNT_ID` | optional | Cloudflare account ID (required alongside the API key) |
+| `CLOUDFLARE_MODEL` | optional | Workers AI model override (default `@cf/meta/llama-3.1-8b-instruct`) |
 
 ## Deploy (Vercel + Neon)
 
 1. Create a Neon Postgres database via the Vercel Marketplace (sets `DATABASE_URL`).
 2. Add `GITHUB_TOKEN`, `IP_HASH_SALT`, and `NEXT_PUBLIC_APP_URL` to the Vercel
-   project environment. Optionally add `CLOUDFLARE_AI_URL` / `CLOUDFLARE_AI_SECRET`.
+   project environment. Optionally add `CLOUDFLARE_API_KEY` / `CLOUDFLARE_ACCOUNT_ID`.
 3. Apply migrations against the Neon branch: `npm run db:migrate`.
 4. Deploy. The app builds and the `/demo` page renders even without a database.
 
-To enable real AI summaries, deploy the worker in
-[`cloudflare/roadmap-worker`](cloudflare/roadmap-worker/README.md) and set the two
-`CLOUDFLARE_AI_*` variables. Without them, RepoPilot uses the built-in template
-roadmap.
+To enable real AI executive summaries, set `CLOUDFLARE_API_KEY` and
+`CLOUDFLARE_ACCOUNT_ID` (a Cloudflare API token with Workers AI access plus your
+account ID). RepoPilot calls the Cloudflare Workers AI REST API directly — no
+separate Worker to deploy. Without these, it uses the built-in template roadmap.
 
 ## Scripts
 

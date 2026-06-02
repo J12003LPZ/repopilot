@@ -1,8 +1,0 @@
-name = "repopilot-roadmap-worker"
-main = "src/index.ts"
-compatibility_date = "2025-01-01"
-
-[ai]
-binding = "AI"
-
-# Set SHARED_SECRET via: wrangler secret put SHARED_SECRET
