@@ -111,7 +111,7 @@ No auth means abuse protection matters:
 npm install
 
 # 2. Configure environment
-cp .env.local.example .env.local
+cp .env.example .env.local
 #    then fill in DATABASE_URL, GITHUB_TOKEN, IP_HASH_SALT (see below)
 
 # 3. Push the schema to your Neon database
