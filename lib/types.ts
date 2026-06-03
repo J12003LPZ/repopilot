@@ -28,6 +28,8 @@ export type Roadmap = {
   longTermPlan: string[];
   firstPullRequest: string;
   estimatedImpact: string;
+  /** Diagnostics, e.g. `aiStatus: "ok" | "fallback:<reason>" | "disabled:..."`. */
+  metadata?: Record<string, unknown>;
 };
 
 export type Scores = {

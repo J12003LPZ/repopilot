@@ -1,7 +1,8 @@
 import { gunzipSync } from "node:zlib";
 import {
   selectInterestingFiles,
-  MAX_FILE_BYTES,
+  shouldCaptureContent,
+  captureByteLimit,
   type TarEntry,
   type ExtractResult,
 } from "@/lib/github/extractTarball";
@@ -9,22 +10,12 @@ import {
 export const MAX_TARBALL_BYTES = 50 * 1024 * 1024;
 export const MAX_DECOMPRESSED_TAR_BYTES = 100 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 15_000;
-const MAX_CAPTURED_CONTENT_BYTES = 2 * 1024 * 1024;
+// Total content we buffer across all captured files during tar parsing. The
+// per-file caps and final budget-aware selection live in extractTarball.ts.
+const MAX_CAPTURED_CONTENT_BYTES = 8 * 1024 * 1024;
 
-const INTERESTING_BASENAMES = new Set([
-  "readme.md",
-  "package.json",
-  "tsconfig.json",
-  ".env",
-  ".env.example",
-  ".env.sample",
-  "security.md",
-]);
-
-function isInterestingPath(path: string): boolean {
-  const rel = path.includes("/") ? path.slice(path.indexOf("/") + 1) : path;
-  const base = rel.toLowerCase().split("/").pop() ?? "";
-  return INTERESTING_BASENAMES.has(base);
+function repoRelativePath(path: string): string {
+  return path.includes("/") ? path.slice(path.indexOf("/") + 1) : path;
 }
 
 async function readLimitedBody(res: Response): Promise<ArrayBuffer> {
@@ -79,11 +70,12 @@ function parseTar(buffer: Buffer): TarEntry[] {
     const contentStart = offset + 512;
 
     if (typeFlag === "0" || typeFlag === "") {
+      const rel = repoRelativePath(name);
       let content: string | undefined;
       if (
-        size <= MAX_FILE_BYTES &&
+        size <= captureByteLimit(rel) &&
         capturedBytes + size <= MAX_CAPTURED_CONTENT_BYTES &&
-        isInterestingPath(name)
+        shouldCaptureContent(rel)
       ) {
         content = buffer.subarray(contentStart, contentStart + size).toString("utf8");
         capturedBytes += size;
