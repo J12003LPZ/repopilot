@@ -62,8 +62,11 @@ export function buildEvidencePack(
   const includedFiles: EvidenceFile[] = [];
   const excerptedPaths = new Set<string>();
 
-  // Reserve room for the tree section and a newline before excerpts.
-  let used = treeSection.length + 2;
+  // Reserve room for the tree section, the excerpts-section header, and the
+  // "\n\n" separators joining the (up to three) sections — so the per-block
+  // budget check below reflects the true assembled length and the final
+  // slice() backstop never has to trim an excerpt body.
+  let used = treeSection.length + EXCERPTS_HEADER.length + 8;
 
   for (const { path, content } of ranked) {
     if (excerptBlocks.length >= maxFiles) break;
@@ -86,10 +89,7 @@ export function buildEvidencePack(
   const parts: string[] = [treeSection];
   if (overflowSection) parts.push(overflowSection);
   if (excerptBlocks.length > 0) {
-    parts.push(
-      "CODE EXCERPTS (line-numbered; cite issues as path:line):\n" +
-        excerptBlocks.join("\n")
-    );
+    parts.push(EXCERPTS_HEADER + "\n" + excerptBlocks.join("\n"));
   }
 
   let text = parts.join("\n\n");
@@ -134,6 +134,8 @@ function roleFor(path: string): string {
 }
 
 type Window = { startLine: number; endLine: number; body: string };
+
+const EXCERPTS_HEADER = "CODE EXCERPTS (line-numbered; cite issues as path:line):";
 
 const INTERESTING = [
   "export", "async function", "function ", "class ", "route", "handler",
