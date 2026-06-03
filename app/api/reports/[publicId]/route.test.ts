@@ -20,9 +20,29 @@ describe("GET /api/reports/[publicId]", () => {
     expect(res.status).toBe(404);
   });
 
-  it("returns the report without leaking the scan token", async () => {
+  it("returns 404 for incomplete scans", async () => {
     (queries.getScanByPublicId as any).mockResolvedValue({
-      scan: { id: "s1", status: "complete", scanToken: "SECRET", overallScore: 88 },
+      scan: { id: "s1", status: "running", scanToken: "SECRET", overallScore: null },
+      repo: { githubOwner: "a", githubName: "b" },
+      findings: [],
+      repoMetrics: null,
+      qualityMetrics: null,
+      securityMetrics: null,
+    });
+    const res = await GET(new Request("http://localhost") as any, ctx("rp_abc") as any);
+    expect(res.status).toBe(404);
+  });
+
+  it("returns the report without leaking private scan fields", async () => {
+    (queries.getScanByPublicId as any).mockResolvedValue({
+      scan: {
+        id: "s1",
+        status: "complete",
+        scanToken: "SECRET",
+        ipHash: "IP_HASH",
+        userAgent: "UA",
+        overallScore: 88,
+      },
       repo: { githubOwner: "a", githubName: "b" },
       findings: [],
       repoMetrics: null,
@@ -34,5 +54,8 @@ describe("GET /api/reports/[publicId]", () => {
     const json = await res.json();
     expect(json.scan.overallScore).toBe(88);
     expect(JSON.stringify(json)).not.toContain("SECRET");
+    expect(JSON.stringify(json)).not.toContain("IP_HASH");
+    expect(JSON.stringify(json)).not.toContain("UA");
+    expect(json.scan.id).toBeUndefined();
   });
 });

@@ -1,9 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/db/queries", () => ({
-  countRecentScansByIp: vi.fn(),
-  insertRepository: vi.fn(),
-  insertScan: vi.fn(),
+  insertScanWithRateLimit: vi.fn(),
 }));
 vi.mock("@/lib/scanners/runScan", () => ({ runScan: vi.fn() }));
 
@@ -20,9 +18,10 @@ function req(body: unknown): Request {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  (queries.countRecentScansByIp as any).mockResolvedValue({ recent: 0, active: 0 });
-  (queries.insertRepository as any).mockResolvedValue("repo-uuid");
-  (queries.insertScan as any).mockResolvedValue("scan-uuid");
+  (queries.insertScanWithRateLimit as any).mockResolvedValue({
+    allowed: true,
+    scanId: "scan-uuid",
+  });
 });
 
 describe("POST /api/scans", () => {
@@ -42,13 +41,19 @@ describe("POST /api/scans", () => {
   });
 
   it("returns 429 when the hourly limit is reached", async () => {
-    (queries.countRecentScansByIp as any).mockResolvedValue({ recent: 5, active: 0 });
+    (queries.insertScanWithRateLimit as any).mockResolvedValue({
+      allowed: false,
+      reason: "hourly_limit",
+    });
     const res = await POST(req({ githubUrl: "https://github.com/vercel/next.js" }));
     expect(res.status).toBe(429);
   });
 
   it("returns 429 when an active scan is already running", async () => {
-    (queries.countRecentScansByIp as any).mockResolvedValue({ recent: 1, active: 1 });
+    (queries.insertScanWithRateLimit as any).mockResolvedValue({
+      allowed: false,
+      reason: "active_limit",
+    });
     const res = await POST(req({ githubUrl: "https://github.com/vercel/next.js" }));
     expect(res.status).toBe(429);
   });

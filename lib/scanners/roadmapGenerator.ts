@@ -49,32 +49,65 @@ function buildSummary(repoName: string, scores: Scores, riskCount: number): stri
     riskCount === 0
       ? "No critical or high-severity risks were detected."
       : `${riskCount} high-priority risk${riskCount === 1 ? "" : "s"} need attention.`;
-  return `${repoName} has an overall health score of ${scores.overall}/100 (${health}). Activity ${scores.activity}, quality ${scores.quality}, security ${scores.security}. ${riskClause}`;
+  const weakest = weakestScore(scores);
+  return `${repoName} has an overall health score of ${scores.overall}/100 (${health}). Activity ${scores.activity}, quality ${scores.quality}, security ${scores.security}. ${riskClause} Start with ${weakest.label.toLowerCase()} work because it is the weakest measured area.`;
 }
 
 function buildLongTermPlan(scores: Scores): string[] {
   const plan: string[] = [];
-  if (scores.quality < 80)
-    plan.push("Raise code-quality baseline: add CI, linting, type checks, and tests.");
-  if (scores.security < 80)
-    plan.push("Harden security: add a lockfile, SECURITY.md, and dependency scanning.");
-  if (scores.activity < 80)
-    plan.push("Improve maintainability: triage stale issues and reduce PR review latency.");
-  plan.push("Add documentation depth: usage examples, screenshots, and architecture notes.");
+  if (scores.quality < 80) {
+    plan.push(
+      "Week 1: raise the quality baseline by adding or fixing CI, linting, type checks, and a repeatable test command."
+    );
+  }
+  if (scores.security < 80) {
+    plan.push(
+      "Week 1: close security hygiene gaps with a committed lockfile, SECURITY.md, dependency audit, and secret-handling review."
+    );
+  }
+  if (scores.activity < 80) {
+    plan.push(
+      "Week 2: reduce maintenance drag by triaging stale issues, labeling blocked PRs, and documenting review ownership."
+    );
+  }
+  plan.push(
+    "Week 2: improve the report surface for new contributors with setup steps, screenshots, architecture notes, and a short contributing path."
+  );
+  plan.push(
+    "Ongoing: keep the score honest by running tests, lint, type checks, and dependency audits before every release."
+  );
   return plan;
 }
 
 function suggestFirstPR(topRisks: Finding[], quickWins: Finding[]): string {
   const candidate = topRisks[0] ?? quickWins[0];
   if (!candidate) {
-    return "The repository is in good shape. A strong first PR would add a CONTRIBUTING.md and an architecture overview to the README.";
+    return [
+      "First PR: add a CONTRIBUTING.md and an architecture overview to the README.",
+      "Why: the scan did not find urgent defects, so the best next report improvement is making healthy practices visible and repeatable.",
+      "Change: document setup, test commands, release checks, ownership, and the main runtime boundaries.",
+      "Verify: a new contributor can clone the repo, run the documented commands, and understand where to make a first change.",
+    ].join("\n");
   }
-  return `Address "${candidate.title}". ${candidate.recommendation}`;
+  return [
+    `First PR: ${candidate.title}.`,
+    `Why: ${candidate.description}`,
+    `Change: ${candidate.recommendation}`,
+    `Verify: add or update the smallest relevant check for ${candidate.category} so this does not regress.`,
+  ].join("\n");
 }
 
 function buildImpact(riskCount: number, quickWinCount: number): string {
   if (riskCount === 0 && quickWinCount === 0) {
-    return "Low remaining effort — focus on polish and documentation.";
+    return "Expected result: low remaining engineering risk, clearer onboarding, and a report that is easier to trust during review.";
   }
-  return `Resolving the top ${riskCount} risk${riskCount === 1 ? "" : "s"} and ${quickWinCount} quick win${quickWinCount === 1 ? "" : "s"} would meaningfully raise the overall health score and reduce onboarding friction.`;
+  return `Expected result: resolving the top ${riskCount} risk${riskCount === 1 ? "" : "s"} and ${quickWinCount} quick win${quickWinCount === 1 ? "" : "s"} should raise the health score, reduce reviewer friction, and turn the report into a concrete engineering backlog.`;
+}
+
+function weakestScore(scores: Scores): { label: string; value: number } {
+  return [
+    { label: "Activity", value: scores.activity },
+    { label: "Quality", value: scores.quality },
+    { label: "Security", value: scores.security },
+  ].sort((a, b) => a.value - b.value)[0];
 }

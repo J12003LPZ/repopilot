@@ -36,4 +36,12 @@ describe("createScanSchema", () => {
     });
     expect(parsed.success).toBe(false);
   });
+
+  it("rejects non-http deployed url schemes", () => {
+    const parsed = createScanSchema.safeParse({
+      githubUrl: "https://github.com/a/b",
+      deployedUrl: "javascript:alert(1)",
+    });
+    expect(parsed.success).toBe(false);
+  });
 });

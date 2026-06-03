@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { ScoreBar } from "@/components/ui/Progress";
 import { FindingsTable } from "@/components/dashboard/FindingsTable";
@@ -24,7 +23,7 @@ function scoreColor(score: number): string {
 }
 
 export function PublicReport({ data }: Props) {
-  const { scan, repo, securityMetrics } = data;
+  const { scan, repo, repoMetrics, securityMetrics } = data;
   const roadmap = scan.roadmap as {
     executiveSummary?: string;
     topRisks?: any[];
@@ -35,6 +34,14 @@ export function PublicReport({ data }: Props) {
   } | null;
 
   const overallScore: number = scan.overallScore ?? 0;
+  const snapshot = [
+    { label: "Language", value: repo?.primaryLanguage ?? "Unknown" },
+    { label: "Stars", value: repo?.stars ?? 0 },
+    { label: "Forks", value: repo?.forks ?? 0 },
+    { label: "Commits 30d", value: repoMetrics?.commits30d ?? 0 },
+    { label: "Open Issues", value: repoMetrics?.openIssues ?? 0 },
+    { label: "Open PRs", value: repoMetrics?.openPrs ?? 0 },
+  ];
 
   return (
     <div className="min-h-screen bg-background text-text-primary">
@@ -53,13 +60,23 @@ export function PublicReport({ data }: Props) {
         {/* Action row — hidden when printing */}
         <div className="flex flex-wrap gap-2 mb-10 print:hidden">
           <PrintButton />
-          <Link
-            href={`/scan/${scan.id}`}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-card-hover hover:text-text-primary"
-          >
-            View Technical Dashboard
-          </Link>
           <CopyLinkButton />
+        </div>
+
+        <h2 className="text-xl font-semibold mt-10 mb-3">
+          Repository Snapshot
+        </h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 mb-6">
+          {snapshot.map(({ label, value }) => (
+            <div key={label} className="border border-border bg-card px-4 py-3">
+              <p className="text-xs font-mono uppercase tracking-wider text-text-muted">
+                {label}
+              </p>
+              <p className="mt-1 text-lg font-semibold text-text-primary">
+                {value}
+              </p>
+            </div>
+          ))}
         </div>
 
         {/* Overall Health */}
@@ -96,6 +113,19 @@ export function PublicReport({ data }: Props) {
             </Card>
           ))}
         </div>
+
+        {roadmap?.firstPullRequest && (
+          <>
+            <h2 className="text-xl font-semibold mt-10 mb-3">
+              What To Fix Next
+            </h2>
+            <Card className="mb-6">
+              <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-line">
+                {roadmap.firstPullRequest}
+              </p>
+            </Card>
+          </>
+        )}
 
         {/* Executive Summary */}
         {(scan.aiSummary ?? roadmap?.executiveSummary) && (
@@ -176,20 +206,6 @@ export function PublicReport({ data }: Props) {
                   </li>
                 )}
               </ul>
-            </Card>
-          </>
-        )}
-
-        {/* Suggested First Pull Request */}
-        {roadmap?.firstPullRequest && (
-          <>
-            <h2 className="text-xl font-semibold mt-10 mb-3">
-              Suggested First Pull Request
-            </h2>
-            <Card className="mb-6">
-              <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-line">
-                {roadmap.firstPullRequest}
-              </p>
             </Card>
           </>
         )}

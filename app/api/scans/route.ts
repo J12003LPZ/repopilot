@@ -1,20 +1,19 @@
 import { after } from "next/server";
 import { createScanSchema } from "@/lib/validators/scanSchema";
 import { parseRepoUrl } from "@/lib/github/parseRepoUrl";
-import { evaluateRateLimit } from "@/lib/utils/rateLimit";
+import { ACTIVE_SCAN_LIMIT, HOURLY_SCAN_LIMIT } from "@/lib/utils/rateLimit";
 import { hashIp } from "@/lib/utils/hashIp";
 import { generatePublicId, generateScanToken } from "@/lib/utils/generateIds";
-import {
-  countRecentScansByIp,
-  insertRepository,
-  insertScan,
-} from "@/lib/db/queries";
+import { insertScanWithRateLimit } from "@/lib/db/queries";
 import { runScan } from "@/lib/scanners/runScan";
 
 function getIp(req: Request): string {
-  const fwd = req.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0].trim();
-  return req.headers.get("x-real-ip") ?? "0.0.0.0";
+  const vercelForwardedFor = req.headers.get("x-vercel-forwarded-for");
+  const forwardedFor = req.headers.get("x-forwarded-for");
+  const realIp = req.headers.get("x-real-ip");
+  const candidate =
+    vercelForwardedFor ?? (process.env.VERCEL ? forwardedFor : realIp ?? forwardedFor);
+  return candidate?.split(",")[0].trim() || "0.0.0.0";
 }
 
 export async function POST(req: Request) {
@@ -39,36 +38,39 @@ export async function POST(req: Request) {
   }
 
   const ipHash = await hashIp(getIp(req));
-  const oneHourAgo = new Date(Date.now() - 3600_000).toISOString();
-  const { recent, active } = await countRecentScansByIp(ipHash, oneHourAgo);
-  const limit = evaluateRateLimit({ recentScanCount: recent, activeScanCount: active });
-  if (!limit.allowed) {
+  const publicId = generatePublicId();
+  const scanToken = generateScanToken();
+  const expiresAt = new Date(Date.now() + 30 * 86400000);
+
+  const created = await insertScanWithRateLimit({
+    repository: {
+      owner: repo.owner,
+      name: repo.name,
+      url: `https://github.com/${repo.owner}/${repo.name}`,
+    },
+    scan: {
+      deployedUrl: parsed.data.deployedUrl,
+      publicId,
+      scanToken,
+      ipHash,
+      userAgent: req.headers.get("user-agent") ?? "",
+      expiresAt,
+    },
+    rateLimit: {
+      since: new Date(Date.now() - 3600_000),
+      hourlyLimit: HOURLY_SCAN_LIMIT,
+      activeLimit: ACTIVE_SCAN_LIMIT,
+    },
+  });
+  if (!created.allowed) {
     const message =
-      limit.reason === "active_limit"
+      created.reason === "active_limit"
         ? "You already have a scan running. Please wait for it to finish."
         : "Hourly scan limit reached. Please try again later.";
     return Response.json({ error: message }, { status: 429 });
   }
 
-  const repositoryId = await insertRepository({
-    owner: repo.owner,
-    name: repo.name,
-    url: `https://github.com/${repo.owner}/${repo.name}`,
-  });
-
-  const publicId = generatePublicId();
-  const scanToken = generateScanToken();
-  const expiresAt = new Date(Date.now() + 30 * 86400000);
-
-  const scanId = await insertScan({
-    repositoryId,
-    deployedUrl: parsed.data.deployedUrl,
-    publicId,
-    scanToken,
-    ipHash,
-    userAgent: req.headers.get("user-agent") ?? "",
-    expiresAt,
-  });
+  const scanId = created.scanId;
 
   // Run the pipeline in the background after the response is sent.
   after(async () => {

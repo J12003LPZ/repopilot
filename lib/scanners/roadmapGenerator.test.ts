@@ -77,6 +77,22 @@ describe("generateTemplateRoadmap", () => {
     expect(Array.isArray(roadmap.longTermPlan)).toBe(true);
   });
 
+  it("turns findings into concrete report-ready work items", () => {
+    const roadmap = generateTemplateRoadmap({
+      repoName: "acme/widget",
+      scores,
+      findings,
+    });
+
+    expect(roadmap.firstPullRequest).toContain("First PR:");
+    expect(roadmap.firstPullRequest).toContain("Why:");
+    expect(roadmap.firstPullRequest).toContain("Change:");
+    expect(roadmap.firstPullRequest).toContain("Verify:");
+    expect(roadmap.longTermPlan[0]).toMatch(/^Week 1:/);
+    expect(roadmap.longTermPlan.some((item) => item.includes("security"))).toBe(true);
+    expect(roadmap.estimatedImpact).toContain("Expected result:");
+  });
+
   it("handles a clean repo with no findings", () => {
     const roadmap = generateTemplateRoadmap({
       repoName: "acme/clean",

@@ -37,9 +37,12 @@ function HistoryRow({
 
   useEffect(() => {
     let active = true;
-    fetch(`/api/scans/${entry.scanId}`)
+    const token = localStorage.getItem(`repopilot-scan-token-${entry.scanId}`);
+    fetch(`/api/scans/${entry.scanId}`, {
+      headers: token ? { "x-scan-token": token } : {},
+    })
       .then((res) => {
-        if (res.status === 404) {
+        if (res.status === 404 || res.status === 403) {
           if (active) setNotFound(true);
           return null;
         }

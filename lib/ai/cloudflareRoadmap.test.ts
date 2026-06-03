@@ -64,6 +64,26 @@ describe("getRoadmap", () => {
     expect(calledInit.headers.Authorization).toBe("Bearer cf-token");
   });
 
+  it("prompts the AI with concrete findings and practical-fix guidance", async () => {
+    setCfEnv();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ result: { response: "AI executive summary for a/b." } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getRoadmap({ repoName: "a/b", scores, findings });
+
+    const [, calledInit] = fetchMock.mock.calls[0];
+    const body = JSON.parse(calledInit.body as string);
+    const promptText = body.messages.map((m: { content: string }) => m.content).join("\n");
+    expect(promptText).toContain("look for concrete engineering work");
+    expect(promptText).toContain("avoid generic advice");
+    expect(promptText).toContain("Possible exposed secret");
+    expect(promptText).toContain("description: x");
+    expect(promptText).toContain("recommended work: y");
+  });
+
   it("uses the AI executive summary but keeps template-derived risks and quick wins", async () => {
     setCfEnv();
     vi.stubGlobal(

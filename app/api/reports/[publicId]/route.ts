@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getScanByPublicId } from "@/lib/db/queries";
+import { toPublicReportPayload } from "@/lib/db/safeScanPayload";
 
 export async function GET(
   _req: NextRequest,
@@ -7,10 +8,8 @@ export async function GET(
 ) {
   const { publicId } = await ctx.params;
   const payload = await getScanByPublicId(publicId);
-  if (!payload) {
+  if (!payload || payload.scan.status !== "complete") {
     return Response.json({ error: "Report not found" }, { status: 404 });
   }
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { scanToken, ipHash, ...safeScan } = payload.scan;
-  return Response.json({ ...payload, scan: safeScan });
+  return Response.json(toPublicReportPayload(payload));
 }

@@ -1,4 +1,4 @@
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq, gt, gte, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import {
   repositories,
@@ -68,6 +68,80 @@ export async function insertScan(input: {
   return row.id;
 }
 
+export async function insertScanWithRateLimit(input: {
+  repository: {
+    owner: string;
+    name: string;
+    url: string;
+  };
+  scan: {
+    deployedUrl?: string;
+    publicId: string;
+    scanToken: string;
+    ipHash: string;
+    userAgent: string;
+    expiresAt: Date;
+  };
+  rateLimit: {
+    since: Date;
+    hourlyLimit: number;
+    activeLimit: number;
+  };
+}): Promise<
+  | { allowed: true; scanId: string }
+  | { allowed: false; reason: "hourly_limit" | "active_limit" }
+> {
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext(${input.scan.ipHash})::bigint)`
+    );
+
+    const recentRows = await tx
+      .select({ id: scans.id, status: scans.status })
+      .from(scans)
+      .where(
+        and(
+          eq(scans.ipHash, input.scan.ipHash),
+          gte(scans.createdAt, input.rateLimit.since)
+        )
+      );
+    const active = recentRows.filter(
+      (r) => r.status === "queued" || r.status === "running"
+    ).length;
+    if (active >= input.rateLimit.activeLimit) {
+      return { allowed: false, reason: "active_limit" };
+    }
+    if (recentRows.length >= input.rateLimit.hourlyLimit) {
+      return { allowed: false, reason: "hourly_limit" };
+    }
+
+    const [repository] = await tx
+      .insert(repositories)
+      .values({
+        githubOwner: input.repository.owner,
+        githubName: input.repository.name,
+        githubUrl: input.repository.url,
+      })
+      .returning({ id: repositories.id });
+    const [scan] = await tx
+      .insert(scans)
+      .values({
+        repositoryId: repository.id,
+        deployedUrl: input.scan.deployedUrl,
+        publicId: input.scan.publicId,
+        scanToken: input.scan.scanToken,
+        ipHash: input.scan.ipHash,
+        userAgent: input.scan.userAgent,
+        status: "queued",
+        expiresAt: input.scan.expiresAt,
+      })
+      .returning({ id: scans.id });
+    await tx.insert(scanJobs).values({ scanId: scan.id, status: "queued" });
+
+    return { allowed: true, scanId: scan.id };
+  });
+}
+
 export async function updateScanStatus(
   scanId: string,
   status: string,
@@ -133,7 +207,10 @@ export async function saveSecurityMetrics(
 }
 
 export async function getScanById(scanId: string) {
-  const [scan] = await db.select().from(scans).where(eq(scans.id, scanId));
+  const [scan] = await db
+    .select()
+    .from(scans)
+    .where(and(eq(scans.id, scanId), gt(scans.expiresAt, new Date())));
   if (!scan) return null;
   const [repo] = scan.repositoryId
     ? await db.select().from(repositories).where(eq(repositories.id, scan.repositoryId))
@@ -155,7 +232,10 @@ export async function getScanById(scanId: string) {
 }
 
 export async function getScanByPublicId(publicId: string) {
-  const [scan] = await db.select().from(scans).where(eq(scans.publicId, publicId));
+  const [scan] = await db
+    .select()
+    .from(scans)
+    .where(and(eq(scans.publicId, publicId), gt(scans.expiresAt, new Date())));
   if (!scan) return null;
   return getScanById(scan.id);
 }
@@ -164,7 +244,7 @@ export async function getScanToken(scanId: string): Promise<string | null> {
   const [row] = await db
     .select({ token: scans.scanToken })
     .from(scans)
-    .where(eq(scans.id, scanId));
+    .where(and(eq(scans.id, scanId), gt(scans.expiresAt, new Date())));
   return row?.token ?? null;
 }
 

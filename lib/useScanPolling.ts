@@ -39,9 +39,13 @@ export function useScanPolling(scanId: string) {
 
     async function poll() {
       try {
-        const res = await fetch(`/api/scans/${scanId}`);
+        const token = localStorage.getItem(`repopilot-scan-token-${scanId}`);
+        const res = await fetch(`/api/scans/${scanId}`, {
+          headers: token ? { "x-scan-token": token } : {},
+        });
         if (!res.ok) {
           if (res.status === 404) setError("Scan not found.");
+          if (res.status === 403) setError("This dashboard requires the creator token.");
           return;
         }
         const payload = (await res.json()) as ScanPayload;

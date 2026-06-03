@@ -10,6 +10,9 @@ export const createScanSchema = z.object({
     }),
   deployedUrl: z
     .url("Enter a valid URL")
+    .refine((v) => v.startsWith("https://") || v.startsWith("http://"), {
+      message: "Enter an http or https URL",
+    })
     .optional()
     .or(z.literal("").transform(() => undefined)),
 });
