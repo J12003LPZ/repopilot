@@ -76,8 +76,8 @@ function readCitation(finding: Finding): Citation | null {
     c.file.trim().length === 0 ||
     typeof c.startLine !== "number" ||
     typeof c.endLine !== "number" ||
-    !Number.isFinite(c.startLine) ||
-    !Number.isFinite(c.endLine)
+    !Number.isInteger(c.startLine) ||
+    !Number.isInteger(c.endLine)
   ) {
     return null;
   }
@@ -112,10 +112,12 @@ export function normalizeCitedPath(path: string): string {
   let p = path.trim().replace(/\\/g, "/");
   if (p.startsWith("./")) p = p.slice(2);
   p = p.replace(/^\/+/, "");
-  // Heuristic repo-prefix strip: GitHub tarballs prefix every path with
-  // "<repo>-<ref>/". We strip the first segment only when more segments remain.
+  // Heuristic repo-prefix strip: GitHub tarballs prefix every path with a top
+  // dir like "<repo>-<ref>/" where <ref> is a branch/tag (main, master, v1.2.3)
+  // or a 7-40 char commit SHA. Strip ONLY that pattern — never a legitimate
+  // hyphenated source dir like "my-utils/" — and only when more segments remain.
   const segments = p.split("/");
-  if (segments.length > 1 && /-/.test(segments[0])) {
+  if (segments.length > 1 && /-(?:main|master|develop|v[\d.]+|[0-9a-f]{7,40})$/i.test(segments[0])) {
     p = segments.slice(1).join("/");
   }
   return p.toLowerCase();

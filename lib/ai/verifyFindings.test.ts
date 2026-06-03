@@ -32,6 +32,15 @@ describe("normalizeCitedPath", () => {
   it("leaves an already-clean repo-relative path unchanged", () => {
     expect(normalizeCitedPath("lib/db.ts")).toBe("lib/db.ts");
   });
+
+  it("does NOT strip a legitimate hyphenated source directory", () => {
+    expect(normalizeCitedPath("my-utils/db.ts")).toBe("my-utils/db.ts");
+    expect(normalizeCitedPath("e2e-tests/auth.ts")).toBe("e2e-tests/auth.ts");
+  });
+
+  it("strips a tarball prefix ending in a commit sha", () => {
+    expect(normalizeCitedPath("repopilot-a1b2c3d4/lib/db.ts")).toBe("lib/db.ts");
+  });
 });
 
 describe("verifyFindings", () => {
@@ -100,9 +109,30 @@ describe("verifyFindings", () => {
     expect(droppedCount).toBe(1);
   });
 
+  it("drops a finding whose metadata is entirely absent", () => {
+    const f: Finding = {
+      category: "quality",
+      severity: "low",
+      title: "No metadata",
+      description: "x",
+      recommendation: "y",
+    };
+    const { verified, droppedCount } = verifyFindings([f], included);
+    expect(verified).toHaveLength(0);
+    expect(droppedCount).toBe(1);
+  });
+
   it("drops a finding whose citation has non-numeric lines", () => {
     const { verified } = verifyFindings(
       [aiFinding({ file: "lib/db.ts", startLine: "20", endLine: "22" })],
+      included
+    );
+    expect(verified).toHaveLength(0);
+  });
+
+  it("drops a finding whose citation has fractional line numbers", () => {
+    const { verified } = verifyFindings(
+      [aiFinding({ file: "lib/db.ts", startLine: 1.5, endLine: 10.5 })],
       included
     );
     expect(verified).toHaveLength(0);
