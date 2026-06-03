@@ -16,6 +16,10 @@ import {
   calculateOverallScore,
 } from "@/lib/scanners/scoring";
 import { getRoadmap } from "@/lib/ai/cloudflareRoadmap";
+import { generateAiFindings } from "@/lib/ai/aiFindings";
+import { mergeFindings } from "@/lib/ai/mergeFindings";
+import { buildEvidencePack } from "@/lib/ai/evidencePack";
+import { verifyFindings } from "@/lib/ai/verifyFindings";
 import {
   updateScanStatus,
   saveFindings,
@@ -102,8 +106,12 @@ export async function runScan(input: {
   let qualityScore = 0;
   let readmeScore = 0;
   let securityScore = 0;
+  // Captured file contents (repo-relative, lowercased keys) reused for the AI
+  // evidence pack after static analysis. Empty if the tarball step fails.
+  let capturedContents: Record<string, string> = {};
   try {
     const extracted = await downloadAndExtract(owner, name, overview.defaultBranch);
+    capturedContents = extracted.fileContents;
 
     let pkg: PackageJson = null;
     if (extracted.fileContents["package.json"]) {
@@ -185,9 +193,35 @@ export async function runScan(input: {
     accessibility: null,
   };
 
-  await saveFindings(scanId, allFindings);
+  // 5. AI pass (advisory). Reads broad, line-numbered code excerpts and proposes
+  // findings the static scanners can't catch. Every AI finding must cite a real
+  // file:line; verifyFindings drops any citation we can't confirm against the
+  // exact excerpts we sent. Never affects the deterministic scores above; falls
+  // back silently if AI is unavailable.
+  const evidence = buildEvidencePack(capturedContents);
+  const ai = await generateAiFindings({
+    repoName,
+    scores,
+    evidence: evidence.text,
+    scannerFindings: allFindings,
+  });
+  const { verified, droppedCount } = verifyFindings(ai.findings, evidence.includedFiles);
+  const aiStatus =
+    ai.status === "ok"
+      ? `ok:verified=${verified.length},dropped=${droppedCount}`
+      : ai.status;
+  const findings = mergeFindings(allFindings, verified);
 
-  const roadmap = await getRoadmap({ repoName, scores, findings: allFindings });
+  await saveFindings(scanId, findings);
+
+  const roadmap = await getRoadmap({
+    repoName,
+    scores,
+    findings,
+    evidence: evidence.text,
+  });
+  // Record AI finding verification stats alongside the roadmap's own aiStatus.
+  roadmap.metadata = { ...(roadmap.metadata ?? {}), aiFindingsStatus: aiStatus };
 
   await updateScanStatus(scanId, "complete", {
     completedAt: new Date(),

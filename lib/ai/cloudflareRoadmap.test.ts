@@ -58,7 +58,7 @@ describe("getRoadmap", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [calledUrl, calledInit] = fetchMock.mock.calls[0];
     expect(calledUrl).toBe(
-      "https://api.cloudflare.com/client/v4/accounts/acct-123/ai/run/@cf/meta/llama-3.1-8b-instruct"
+      "https://api.cloudflare.com/client/v4/accounts/acct-123/ai/run/@cf/meta/llama-4-scout-17b-16e-instruct"
     );
     expect(calledInit.method).toBe("POST");
     expect(calledInit.headers.Authorization).toBe("Bearer cf-token");
@@ -190,5 +190,46 @@ describe("getRoadmap", () => {
     );
     const roadmap = await getRoadmap({ repoName: "a/b", scores, findings });
     expect(roadmap.executiveSummary).toContain("a/b");
+  });
+
+  it("records aiStatus=ok in metadata when the AI summary is used", async () => {
+    setCfEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ result: { response: "AI summary." } }),
+      })
+    );
+    const roadmap = await getRoadmap({ repoName: "a/b", scores, findings });
+    expect(roadmap.metadata?.aiStatus).toBe("ok");
+  });
+
+  it("records a fallback aiStatus with the reason when AI is unavailable", async () => {
+    const roadmap = await getRoadmap({ repoName: "a/b", scores, findings });
+    expect(roadmap.metadata?.aiStatus).toBe("disabled:no-credentials");
+  });
+
+  it("passes code evidence into the AI prompt when provided", async () => {
+    setCfEnv();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ result: { response: "summary" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getRoadmap({
+      repoName: "a/b",
+      scores,
+      findings,
+      evidence: "--- FILE: lib/secret.ts ---\nconst token = process.env.TOKEN;",
+    });
+
+    const [, calledInit] = fetchMock.mock.calls[0];
+    const promptText = JSON.parse(calledInit.body as string)
+      .messages.map((m: { content: string }) => m.content)
+      .join("\n");
+    expect(promptText).toContain("--- FILE: lib/secret.ts ---");
+    expect(promptText).toContain("const token = process.env.TOKEN;");
   });
 });
