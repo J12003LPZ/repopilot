@@ -1,3 +1,5 @@
+import { analyzeReadmeSections } from "@/lib/scanners/readmeAnalysis";
+
 function clamp(score: number): number {
   return Math.max(0, Math.min(100, Math.round(score)));
 }
@@ -73,15 +75,7 @@ export function calculatePRBottleneckScore(
 }
 
 export function calculateReadmeScore(readme: string): number {
-  let score = 0;
-  if (readme.length > 300) score += 20;
-  if (/install|setup/i.test(readme)) score += 15;
-  if (/usage|how to use/i.test(readme)) score += 15;
-  if (/env|environment/i.test(readme)) score += 15;
-  if (/screenshot|demo/i.test(readme)) score += 15;
-  if (/license/i.test(readme)) score += 10;
-  if (/tech stack|built with/i.test(readme)) score += 10;
-  return Math.min(score, 100);
+  return analyzeReadmeSections(readme).score;
 }
 
 export function calculateOverallScore(input: {

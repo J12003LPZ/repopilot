@@ -111,7 +111,22 @@ function formatFindingForPrompt(finding: Finding): string {
   if (finding.source) {
     parts.push(`source: ${limitPromptText(finding.source, 120)}`);
   }
+  const presentSections = getStringArrayMetadata(finding, "presentSections");
+  if (presentSections.length > 0) {
+    parts.push(`present sections: ${presentSections.map((s) => limitPromptText(s, 60)).join(", ")}`);
+  }
+  const missingSections = getStringArrayMetadata(finding, "missingSections");
+  if (missingSections.length > 0) {
+    parts.push(`missing sections: ${missingSections.map((s) => limitPromptText(s, 60)).join(", ")}`);
+  }
   return parts.join("; ");
+}
+
+function getStringArrayMetadata(finding: Finding, key: string): string[] {
+  const value = finding.metadata?.[key];
+  return Array.isArray(value) && value.every((item) => typeof item === "string")
+    ? value
+    : [];
 }
 
 function limitPromptText(value: string, maxLength: number): string {

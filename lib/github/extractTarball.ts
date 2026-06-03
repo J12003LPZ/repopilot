@@ -43,7 +43,7 @@ export function selectInterestingFiles(entries: TarEntry[]): ExtractResult {
       entry.size <= MAX_FILE_BYTES &&
       isInteresting(rel)
     ) {
-      fileContents[rel] = entry.content;
+      fileContents[rel.toLowerCase()] = entry.content;
     }
   }
 

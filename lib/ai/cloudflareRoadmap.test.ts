@@ -84,6 +84,41 @@ describe("getRoadmap", () => {
     expect(promptText).toContain("recommended work: y");
   });
 
+  it("passes README section evidence to the AI prompt when findings include it", async () => {
+    setCfEnv();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ result: { response: "AI executive summary for a/b." } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getRoadmap({
+      repoName: "a/b",
+      scores,
+      findings: [
+        {
+          category: "documentation",
+          severity: "low",
+          title: "Incomplete README",
+          description:
+            "The README covers setup and environment variables, but is missing usage, screenshots or demo, and license.",
+          recommendation:
+            "Add a Usage section, screenshots or demo, and a License section.",
+          metadata: {
+            presentSections: ["setup", "environment variables", "tech stack"],
+            missingSections: ["usage", "screenshots or demo", "license"],
+          },
+        },
+      ],
+    });
+
+    const [, calledInit] = fetchMock.mock.calls[0];
+    const body = JSON.parse(calledInit.body as string);
+    const promptText = body.messages.map((m: { content: string }) => m.content).join("\n");
+    expect(promptText).toContain("present sections: setup, environment variables, tech stack");
+    expect(promptText).toContain("missing sections: usage, screenshots or demo, license");
+  });
+
   it("uses the AI executive summary but keeps template-derived risks and quick wins", async () => {
     setCfEnv();
     vi.stubGlobal(

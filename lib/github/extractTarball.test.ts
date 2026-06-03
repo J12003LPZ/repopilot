@@ -22,6 +22,14 @@ describe("selectInterestingFiles", () => {
     expect(result.fileContents["huge.bin"]).toBeUndefined();
   });
 
+  it("makes README content available through the scanner's lowercase lookup key", () => {
+    const result = selectInterestingFiles([
+      { path: "repo-x/README.md", size: 30, content: "# Story Crafter" },
+    ]);
+
+    expect(result.fileContents["readme.md"]).toBe("# Story Crafter");
+  });
+
   it("caps the number of files scanned", () => {
     const entries = Array.from({ length: MAX_FILES + 50 }, (_, i) => ({
       path: `repo-x/file${i}.ts`,
