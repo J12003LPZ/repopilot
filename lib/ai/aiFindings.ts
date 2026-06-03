@@ -26,10 +26,17 @@ const aiFindingSchema = z.object({
   file: z.string().trim().min(1).max(200),
   startLine: z.number().int().positive(),
   endLine: z.number().int().positive(),
+}).refine((d) => d.endLine >= d.startLine, {
+  // Drop inverted ranges here too (the verifier also catches them) so a
+  // malformed citation never reaches the merge step.
+  message: "endLine must be >= startLine",
 });
 
 // JSON schema for schema-mode output. Workers AI (Scout/3.3) honors
 // response_format; the defensive parser remains the fallback when it doesn't.
+// NOTE: Cloudflare Workers AI places the JSON Schema DIRECTLY under
+// `json_schema` (no OpenAI-style {name, schema} envelope). Do not "fix" this
+// into the OpenAI shape — that would break schema mode on this API.
 const RESPONSE_FORMAT = {
   type: "json_schema",
   json_schema: {
@@ -206,6 +213,7 @@ export function parseAiFindings(text: string, maxFindings = 8): Finding[] {
         citation: { file: d.file, startLine: d.startLine, endLine: d.endLine },
       },
     });
+    // Cap on VALID findings only — items dropped by safeParse above don't count.
     if (findings.length >= maxFindings) break;
   }
   return findings;

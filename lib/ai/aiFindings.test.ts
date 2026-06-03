@@ -100,6 +100,22 @@ describe("parseAiFindings", () => {
     expect(findings[0].title).toBe("good");
   });
 
+  it("drops an item whose endLine is before its startLine", () => {
+    const text = JSON.stringify([
+      {
+        category: "security",
+        severity: "high",
+        title: "inverted range",
+        description: "x",
+        recommendation: "y",
+        file: "lib/a.ts",
+        startLine: 20,
+        endLine: 5,
+      },
+    ]);
+    expect(parseAiFindings(text)).toEqual([]);
+  });
+
   it("returns [] for non-JSON text", () => {
     expect(parseAiFindings("I could not find any issues.")).toEqual([]);
   });
