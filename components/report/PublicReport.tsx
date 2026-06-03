@@ -22,8 +22,16 @@ function scoreColor(score: number): string {
   return "text-danger";
 }
 
+const SEVERITY_RANK: Record<string, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+  info: 4,
+};
+
 export function PublicReport({ data }: Props) {
-  const { scan, repo, repoMetrics, securityMetrics } = data;
+  const { scan, repo, findings: allFindings, repoMetrics, securityMetrics } = data;
   const roadmap = scan.roadmap as {
     executiveSummary?: string;
     topRisks?: any[];
@@ -141,15 +149,23 @@ export function PublicReport({ data }: Props) {
           </>
         )}
 
-        {/* Top 5 Engineering Risks */}
+        {/* Top Engineering Risks — all critical/high findings from the scan */}
         <h2 className="text-xl font-semibold mt-10 mb-3">
           Top Engineering Risks
         </h2>
-        <FindingsTable findings={roadmap?.topRisks ?? []} />
+        <FindingsTable
+          findings={[...allFindings]
+            .filter((f) => f.severity === "critical" || f.severity === "high")
+            .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity])}
+        />
 
-        {/* Quick Wins */}
+        {/* Quick Wins — medium/low findings */}
         <h2 className="text-xl font-semibold mt-10 mb-3">Quick Wins</h2>
-        <FindingsTable findings={roadmap?.quickWins ?? []} />
+        <FindingsTable
+          findings={[...allFindings]
+            .filter((f) => f.severity === "medium" || f.severity === "low")
+            .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity])}
+        />
 
         {/* Long-Term Plan */}
         {roadmap?.longTermPlan && roadmap.longTermPlan.length > 0 && (
